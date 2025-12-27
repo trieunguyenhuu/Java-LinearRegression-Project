@@ -1,0 +1,193 @@
+# HỆ THỐNG DỰ BÁO CHI TIÊU KHÁCH HÀNG
+## Linear Regression - Dự báo theo Account_Key
+
+---
+
+## 📋 MÔ TẢ
+
+Hệ thống sử dụng thuật toán **Linear Regression** để dự báo 3 biến mục tiêu cho khách hàng ngân hàng:
+
+1. **Total_Monthly_Spend (Y1)** - Tổng chi tiêu hàng tháng
+2. **Frequency_Total (Y2)** - Tổng số lần giao dịch
+3. **Amount_Entertainment (Y3)** - Chi tiêu cho giải trí & du lịch
+
+---
+
+## HƯỚNG DẪN SỬ DỤNG
+
+### Bước 1: Chuẩn bị dữ liệu
+
+Đảm bảo file CSV có tên `dataset_mining_final_v2.csv` với format:
+
+```csv
+Account_Key,Account_Type,Account_Open_Date,Customer_Key,Age,Gender_Code,Location_Score,Tenure_Days,Year,Month,Quarter,Total_Monthly_Spend,Frequency_Total,Amount_Entertainment,Frequency_Entertainment,Amount_Food,Frequency_Food,Amount_Shopping,Frequency_Shopping,Amount_Transport,Amount_Utilities,Days_Since_Last_Trans,Pct_Night_Trans,Is_Credit_Card,Pct_Food,Pct_Shopping,Pct_Entertainment,Pct_Transport,Pct_Utilities
+6732,Debit,1977-08-06 06:29:40,9027,58,1,1,17643,2022,1,1,24166361.0,25,0.0,0,5936297.0,9,7664074.0,7,2901161.0,7664829.0,0,0.32,0,0.24564298282227928,0.31713810780199797,0.0,0.12004955979925981,0.3171693495764629
+6732,Debit,1977-08-06 06:29:40,9027,58,1,1,17643,2022,2,1,58695990.0,15,0.0,0,4128094.0,1,33233072.0,7,2961239.0,9844964.0,0,0.2,0,0.07033008558165557,0.5661898197815558,0.0,0.0504504481481614,0.16772805092818097
+6732,Debit,1977-08-06 06:29:40,9027,58,1,1,17643,2022,3,1,23260497.0,20,0.0,0,10783496.0,12,7529954.0,4,3413113.0,1533934.0,0,0.3,0,0.4635969730139472,0.3237228336092733,0.0,0.14673431096506664,0.06594588241171287
+```
+
+### Bước 2: Compile
+
+```bash
+javac LinearRegression.java DataLoader.java SpendingPrediction.java ModelSerializer.java SimpleScalerInfo.java
+```
+
+### Bước 3: Chạy chương trình
+
+```bash
+java SpendingPrediction
+```
+
+---
+
+## 📊 QUY TRÌNH HOẠT ĐỘNG
+
+### Phase 1: Training Models
+
+Chương trình sẽ tự động:
+
+```
+[STEP 1] Loading data...
+Loaded 1000 samples with 13 features
+
+[STEP 2] Splitting data (80% train, 20% test)...
+Training samples: 800
+Testing samples: 200
+
+[STEP 3] Normalizing features...
+Features normalized using min-max scaling
+
+[STEP 4] Training models...
+>>> Training Model 1: Total Monthly Spend <<<
+[Total_Monthly_Spend] Training completed!
+
+>>> Training Model 2: Transaction Frequency <<<
+[Frequency_Total] Training completed!
+
+>>> Training Model 3: Entertainment Spending <<<
+[Amount_Entertainment] Training completed!
+
+[STEP 5] Evaluating models...
+>>> Total_Monthly_Spend <<<
+Test Set Performance:
+  MSE:  1234567.89
+  RMSE: 1111.04
+  R²:   0.8523 (85.23%)
+  MAPE: 12.45%
+...
+
+TRAINING COMPLETED!
+```
+
+### Phase 2: Interactive Prediction
+
+Sau khi training xong, chương trình chuyển sang chế độ **Interactive Mode**:
+
+```
+================================================================================
+PREDICTION BY ACCOUNT_KEY
+================================================================================
+Nhập Account_Key (hoặc 'exit' để thoát): _
+```
+
+---
+
+## CÁCH NHẬP ACCOUNT_KEY ĐỂ DỰ BÁO
+
+### Ví dụ 1: Dự báo cho Account_Key = 123
+
+**Input:**
+```
+Nhập Account_Key (hoặc 'exit' để thoát): 123
+```
+
+**Output:**
+```
+✅ Kết quả dự báo cho Account_Key: 123
+────────────────────────────────────────────────────────────────────────────────
+
+📊 DỰ BÁO:
+   1. Total Monthly Spend:    5,234,567.89 VND
+   2. Transaction Frequency:  28 lần
+   3. Entertainment Spending: 845,678.90 VND
+
+📈 SO SÁNH VỚI GIÁ TRỊ THỰC TẾ:
+────────────────────────────────────────────────────────────────────────────────
+   Total Monthly Spend:
+      Thực tế:  5,200,000.00 VND
+      Dự báo:   5,234,567.89 VND
+      Sai số:   34,567.89 VND (0.66%)
+
+   Transaction Frequency:
+      Thực tế:  28 lần
+      Dự báo:   29 lần
+      Sai số:   1.00 lần (3.57%)
+
+   Entertainment Spending:
+      Thực tế:  800,000.00 VND
+      Dự báo:   845,678.90 VND
+      Sai số:   45,678.90 VND (5.71%)
+
+🔍 THÔNG TIN KHÁCH HÀNG (Raw Features):
+────────────────────────────────────────────────────────────────────────────────
+   Age                      : 30.0000
+   Gender_Code              : 1.0000
+   Location_Score           : 3.0000
+   Tenure_Days              : 365.0000
+   Is_Credit_Card           : 1.0000
+   Avg_Trans_Val            : 185714.2900
+   Days_Since_Last_Trans    : 2.0000
+   Pct_Night_Trans          : 0.1800
+   Pct_Food                 : 0.2880
+   Pct_Shopping             : 0.2310
+   Pct_Transport            : 0.1540
+   Pct_Entertainment        : 0.1540
+   Pct_Utilities            : 0.1730
+────────────────────────────────────────────────────────────────────────────────
+
+
+
+## 📊 VÍ DỤ THỰC TẾ
+
+### Scenario: Dự báo chi tiêu cho khách hàng
+
+**Thông tin khách hàng:**
+- Account_Key: 1001
+- Tuổi: 35
+- Giới tính: Nam
+- Khu vực: TP.HCM (Location_Score = 3)
+- Đã sử dụng dịch vụ: 2 năm (730 ngày)
+- Có thẻ tín dụng
+- Giao dịch trung bình: 350,000 VND
+- Giao dịch gần nhất: 3 ngày trước
+- 15% giao dịch ban đêm
+- Chi tiêu: Food 30%, Shopping 25%, Transport 15%, Entertainment 20%, Utilities 10%
+
+**Chạy dự báo:**
+```bash
+java SpendingPrediction
+
+# Sau khi train xong
+Nhập Account_Key (hoặc 'exit' để thoát): 1001
+```
+
+**Kết quả dự báo:**
+```
+✅ Kết quả dự báo cho Account_Key: 1001
+
+📊 DỰ BÁO:
+   1. Total Monthly Spend:    4,567,890.12 VND
+   2. Transaction Frequency:  26 lần
+   3. Entertainment Spending: 913,578.02 VND
+```
+
+**Ý nghĩa:**
+- Khách hàng dự kiến chi tiêu ~4.6 triệu/tháng
+- Thực hiện ~26 giao dịch/tháng
+- Chi ~913k cho giải trí & du lịch
+
+**Ứng dụng:**
+- Ngân hàng có thể đề xuất hạn mức thẻ tín dụng phù hợp
+- Marketing có thể gửi offers về entertainment (phim, du lịch)
+- Risk management có thể đánh giá khả năng chi trả
+

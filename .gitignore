@@ -1,0 +1,10 @@
+*.class
+
+.vscode/
+
+.DS_Store
+Thumbs.db
+
+*.dat
+
+*.csv
