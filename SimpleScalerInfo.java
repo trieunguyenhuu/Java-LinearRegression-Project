@@ -25,8 +25,8 @@ public class SimpleScalerInfo {
             "Total_Monthly_Spend",
             100000.0,      // min: 100k VND
             50000000.0,    // max: 50M VND
-            11796057.0,     // mean: ~5M VND
-            10678200.0      // median: ~3M VND
+            11810652.0,     // mean: ~5M VND
+            10694435.0      // median: ~3M VND
         ));
         
         // Y2: Frequency Total (số lần giao dịch)
@@ -35,8 +35,8 @@ public class SimpleScalerInfo {
             "Frequency_Total",
             0.0,           // min: 0 lần
             100.0,         // max: 100 lần
-            46.0,          // mean: ~25 lần
-            46.0           // median: ~20 lần
+            45.0,          // mean: ~25 lần
+            45.0           // median: ~20 lần
         ));
         
         // Y3: Amount Entertainment (VND)
@@ -45,8 +45,8 @@ public class SimpleScalerInfo {
             "Amount_Entertainment",
             0.0,           // min: 0 VND
             10000000.0,    // max: 10M VND
-            1070685.0,     // mean: ~1.5M VND
-            607419.0      // median: ~1M VND
+            1068737.0,     // mean: ~1.5M VND
+            605683.0      // median: ~1M VND
         ));
         
         System.out.println("✓ Initialized SimpleScalerInfo with estimated ranges");

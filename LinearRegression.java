@@ -1,80 +1,61 @@
 import java.util.Arrays;
 
 /**
- * Linear Regression with Ridge Regularization
- * Formula: θ = (X^T * X + λI)^(-1) * X^T * y
- * Ridge regularization prevents singular matrix issues
+ * Linear Regression implementation using Normal Equation method
+ * Công thức: θ = (X^T * X)^(-1) * X^T * y
  */
 public class LinearRegression {
-    private double[] theta;
+    private double[] theta; // Hệ số hồi quy (weights)
     private int numFeatures;
     private String modelName;
-    private double lambda; // Regularization parameter
     
     public LinearRegression(String modelName) {
-        this(modelName, 0.01); // Default lambda = 0.01
-    }
-    
-    public LinearRegression(String modelName, double lambda) {
         this.modelName = modelName;
-        this.lambda = lambda;
     }
     
     /**
-     * Train model using Ridge Regression (Normal Equation with regularization)
-     * θ = (X^T * X + λI)^(-1) * X^T * y
+     * Train model using Normal Equation with Ridge Regularization
+     * @param X Feature matrix (m x n) - m samples, n features
+     * @param y Target vector (m x 1)
      */
     public void train(double[][] X, double[] y) {
-        int m = X.length;
-        int n = X[0].length;
+        int m = X.length; // Số lượng samples
+        int n = X[0].length; // Số lượng features
         this.numFeatures = n;
         
-        System.out.println("[Training] Samples: " + m + ", Features: " + n);
-        System.out.println("[Training] Lambda (regularization): " + lambda);
-        
-        // Add bias column
+        // Thêm cột bias (intercept) - cột toàn số 1 vào đầu
         double[][] X_bias = addBiasColumn(X);
         
-        // Calculate X^T
+        // Tính X^T (transpose của X)
         double[][] X_transpose = transpose(X_bias);
         
-        // Calculate X^T * X
+        // Tính X^T * X
         double[][] XtX = multiply(X_transpose, X_bias);
         
-        // Add regularization: X^T * X + λI
-        // Note: Don't regularize bias term (first row/col)
-        int dim = XtX.length;
-        for (int i = 1; i < dim; i++) { // Start from 1 to skip bias
-            XtX[i][i] += lambda;
+        // Thêm Ridge regularization: (X^T * X + λI)
+        // λ = 0.01 (small regularization to prevent singular matrix)
+        double lambda = 0.01;
+        for (int i = 0; i < XtX.length; i++) {
+            XtX[i][i] += lambda;  // Add to diagonal
         }
         
-        // Calculate (X^T * X + λI)^(-1)
-        double[][] XtX_inv;
-        try {
-            XtX_inv = inverse(XtX);
-        } catch (RuntimeException e) {
-            System.err.println("Matrix still singular even with regularization!");
-            System.err.println("Trying with higher lambda...");
-            
-            // Try with higher lambda
-            for (int i = 1; i < dim; i++) {
-                XtX[i][i] += lambda * 99; // Total lambda = 100 * original
-            }
-            XtX_inv = inverse(XtX);
-        }
+        // Tính (X^T * X + λI)^(-1)
+        double[][] XtX_inv = inverse(XtX);
         
-        // Calculate X^T * y
+        // Tính X^T * y
         double[] Xty = multiplyVector(X_transpose, y);
         
-        // Calculate θ = (X^T * X + λI)^(-1) * X^T * y
+        // Tính θ = (X^T * X + λI)^(-1) * X^T * y
         this.theta = multiplyVector(XtX_inv, Xty);
         
-        System.out.println("[" + modelName + "] Training completed!");
-        System.out.println("Theta (first 5): " + Arrays.toString(Arrays.copyOf(theta, Math.min(5, theta.length))));
+        System.out.println("[" + modelName + "] Training completed with Ridge regularization!");
+        // System.out.println("Theta (coefficients): " + Arrays.toString(theta));
     }
     
     /**
-     * Predict target values
+     * Predict target values for new data
+     * @param X Feature matrix
+     * @return Predicted values
      */
     public double[] predict(double[][] X) {
         int m = X.length;
@@ -116,17 +97,19 @@ public class LinearRegression {
     }
     
     /**
-     * Calculate R-squared
+     * Calculate R-squared (coefficient of determination)
      */
     public double calculateR2(double[][] X, double[] y) {
         double[] predictions = predict(X);
         
+        // Tính mean của y
         double yMean = 0;
         for (double val : y) {
             yMean += val;
         }
         yMean /= y.length;
         
+        // Tính SS_tot và SS_res
         double ssTot = 0, ssRes = 0;
         for (int i = 0; i < y.length; i++) {
             ssTot += Math.pow(y[i] - yMean, 2);
@@ -138,13 +121,16 @@ public class LinearRegression {
     
     // ============ UTILITY METHODS ============
     
+    /**
+     * Thêm cột bias (cột toàn số 1) vào đầu matrix
+     */
     private double[][] addBiasColumn(double[][] X) {
         int m = X.length;
         int n = X[0].length;
         double[][] X_bias = new double[m][n + 1];
         
         for (int i = 0; i < m; i++) {
-            X_bias[i][0] = 1.0;
+            X_bias[i][0] = 1.0; // Bias column
             for (int j = 0; j < n; j++) {
                 X_bias[i][j + 1] = X[i][j];
             }
@@ -152,6 +138,9 @@ public class LinearRegression {
         return X_bias;
     }
     
+    /**
+     * Transpose matrix
+     */
     private double[][] transpose(double[][] matrix) {
         int rows = matrix.length;
         int cols = matrix[0].length;
@@ -165,6 +154,9 @@ public class LinearRegression {
         return result;
     }
     
+    /**
+     * Nhân 2 ma trận
+     */
     private double[][] multiply(double[][] A, double[][] B) {
         int rowsA = A.length;
         int colsA = A[0].length;
@@ -183,6 +175,9 @@ public class LinearRegression {
         return result;
     }
     
+    /**
+     * Nhân ma trận với vector
+     */
     private double[] multiplyVector(double[][] A, double[] b) {
         int rows = A.length;
         int cols = A[0].length;
@@ -198,13 +193,13 @@ public class LinearRegression {
     }
     
     /**
-     * Improved matrix inversion with better numerical stability
+     * Tính ma trận nghịch đảo bằng Gauss-Jordan elimination
      */
     private double[][] inverse(double[][] matrix) {
         int n = matrix.length;
         double[][] augmented = new double[n][2 * n];
         
-        // Create augmented matrix [A | I]
+        // Tạo augmented matrix [A | I]
         for (int i = 0; i < n; i++) {
             for (int j = 0; j < n; j++) {
                 augmented[i][j] = matrix[i][j];
@@ -212,38 +207,39 @@ public class LinearRegression {
             augmented[i][n + i] = 1.0;
         }
         
-        // Gauss-Jordan elimination with partial pivoting
+        // Gauss-Jordan elimination
         for (int i = 0; i < n; i++) {
-            // Find pivot (largest element in column)
-            int maxRow = i;
-            double maxVal = Math.abs(augmented[i][i]);
-            for (int k = i + 1; k < n; k++) {
-                double val = Math.abs(augmented[k][i]);
-                if (val > maxVal) {
-                    maxVal = val;
-                    maxRow = k;
-                }
-            }
-            
-            // Swap rows if needed
-            if (maxRow != i) {
-                double[] temp = augmented[i];
-                augmented[i] = augmented[maxRow];
-                augmented[maxRow] = temp;
-            }
-            
-            // Check for singular matrix
+            // Tìm pivot
             double pivot = augmented[i][i];
+            
+            // Nếu pivot quá nhỏ, tìm row khác để swap
             if (Math.abs(pivot) < 1e-10) {
-                throw new RuntimeException("Matrix is singular and cannot be inverted (pivot too small: " + pivot + ")");
+                int swapRow = -1;
+                for (int k = i + 1; k < n; k++) {
+                    if (Math.abs(augmented[k][i]) > 1e-10) {
+                        swapRow = k;
+                        break;
+                    }
+                }
+                
+                if (swapRow == -1) {
+                    throw new RuntimeException("Matrix is singular and cannot be inverted. " +
+                        "Consider using regularization or removing correlated features.");
+                }
+                
+                // Swap rows
+                double[] temp = augmented[i];
+                augmented[i] = augmented[swapRow];
+                augmented[swapRow] = temp;
+                pivot = augmented[i][i];
             }
             
-            // Divide row by pivot
+            // Chia hàng i cho pivot
             for (int j = 0; j < 2 * n; j++) {
                 augmented[i][j] /= pivot;
             }
             
-            // Eliminate other rows
+            // Khử các phần tử khác trong cột i
             for (int k = 0; k < n; k++) {
                 if (k != i) {
                     double factor = augmented[k][i];
@@ -254,7 +250,7 @@ public class LinearRegression {
             }
         }
         
-        // Extract inverse matrix
+        // Trích xuất ma trận nghịch đảo
         double[][] result = new double[n][n];
         for (int i = 0; i < n; i++) {
             for (int j = 0; j < n; j++) {
@@ -271,14 +267,10 @@ public class LinearRegression {
     
     public void setTheta(double[] theta) {
         this.theta = theta;
-        this.numFeatures = theta.length - 1;
+        this.numFeatures = theta.length - 1; // Trừ bias term
     }
     
     public String getModelName() {
         return modelName;
-    }
-    
-    public void setLambda(double lambda) {
-        this.lambda = lambda;
     }
 }

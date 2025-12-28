@@ -7,15 +7,13 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Data loader for focused time series data
- * Each target Y has its own dataset with only relevant lag features
+ * Data loader for time series format
+ * Multiple rows per account, supports train/validation/test split
  */
 public class DataLoader {
     
     /**
-     * Load focused data for a specific target variable
-     * @param filename Path to cleaned CSV file (e.g., customer_spending_cleaned_Y1_Total_Spend.csv)
-     * @return Dataset object
+     * Load time series dataset
      */
     public static Dataset loadFromCSV(String filename, String targetCol) throws IOException {
         List<Integer> accountKeysList = new ArrayList<>();
@@ -27,7 +25,7 @@ public class DataLoader {
         BufferedReader br = new BufferedReader(new FileReader(filename));
         String line;
         
-        // Đọc header
+        // Read header
         String header = br.readLine();
         String[] headerCols = header.split(",");
         
@@ -40,7 +38,7 @@ public class DataLoader {
         System.out.println("Loading: " + filename);
         System.out.println("Target column: " + targetCol);
         
-        // Identify feature columns (exclude identifiers and target)
+        // Identify feature columns
         List<String> featureColNames = new ArrayList<>();
         for (String col : headerCols) {
             col = col.trim();
@@ -52,11 +50,12 @@ public class DataLoader {
         }
         
         System.out.println("Number of features: " + featureColNames.size());
-        System.out.println("Features: " + featureColNames);
         System.out.println();
         
-        // Đọc dữ liệu
+        // Read data
         int lineCount = 0;
+        int futureCount = 0;
+        
         while ((line = br.readLine()) != null) {
             lineCount++;
             String[] values = line.split(",");
@@ -67,8 +66,14 @@ public class DataLoader {
                 int year = Integer.parseInt(values[colIndexMap.get("Year")].trim());
                 int month = Integer.parseInt(values[colIndexMap.get("Month")].trim());
                 
-                // Read target
-                double target = Double.parseDouble(values[colIndexMap.get(targetCol)]);
+                // Read target (may be NaN for future predictions)
+                String targetStr = values[colIndexMap.get(targetCol)];
+                Double target = null;
+                if (!targetStr.isEmpty() && !targetStr.equalsIgnoreCase("nan")) {
+                    target = Double.parseDouble(targetStr);
+                } else {
+                    futureCount++;
+                }
                 
                 // Read features
                 double[] features = new double[featureColNames.size()];
@@ -96,127 +101,175 @@ public class DataLoader {
         int[] years = yearsList.stream().mapToInt(Integer::intValue).toArray();
         int[] months = monthsList.stream().mapToInt(Integer::intValue).toArray();
         double[][] X = featuresList.toArray(new double[0][]);
-        double[] y = targetList.stream().mapToDouble(Double::doubleValue).toArray();
+        Double[] yBoxed = targetList.toArray(new Double[0]);
         
-        System.out.println("Loaded " + X.length + " samples with " + X[0].length + " features");
+        System.out.println("Loaded " + X.length + " rows with " + X[0].length + " features");
+        System.out.println("Training rows (target != null): " + (X.length - futureCount));
+        System.out.println("Future rows (target = null): " + futureCount);
         System.out.println();
         
-        return new Dataset(accountKeys, years, months, X, y, targetCol);
+        return new Dataset(accountKeys, years, months, X, yBoxed, targetCol);
     }
     
     /**
-     * Split data into train and test sets
+     * Split data into train/validation/test sets
+     * Only uses rows with actual target values (not future predictions)
      */
-    public static Dataset[] splitTrainTest(Dataset dataset, double trainRatio) {
-        int totalSamples = dataset.X.length;
-        int trainSize = (int) (totalSamples * trainRatio);
-        int testSize = totalSamples - trainSize;
+    public static Dataset[] splitTrainValTest(Dataset dataset, 
+                                              double trainRatio, 
+                                              double valRatio) {
+        // Filter out future rows (target = null)
+        List<Integer> trainingIndices = new ArrayList<>();
+        for (int i = 0; i < dataset.y.length; i++) {
+            if (dataset.y[i] != null) {
+                trainingIndices.add(i);
+            }
+        }
         
-        // Train set
+        int totalTraining = trainingIndices.size();
+        int trainSize = (int) (totalTraining * trainRatio);
+        int valSize = (int) (totalTraining * valRatio);
+        int testSize = totalTraining - trainSize - valSize;
+        
+        System.out.println("Splitting training data:");
+        System.out.println("  Train: " + trainSize + " (" + (trainRatio * 100) + "%)");
+        System.out.println("  Validation: " + valSize + " (" + (valRatio * 100) + "%)");
+        System.out.println("  Test: " + testSize + " (" + ((1 - trainRatio - valRatio) * 100) + "%)");
+        
+        // Create train set
         int[] accountKeys_train = new int[trainSize];
         int[] years_train = new int[trainSize];
         int[] months_train = new int[trainSize];
         double[][] X_train = new double[trainSize][];
         double[] y_train = new double[trainSize];
         
-        // Test set
+        for (int i = 0; i < trainSize; i++) {
+            int idx = trainingIndices.get(i);
+            accountKeys_train[i] = dataset.accountKeys[idx];
+            years_train[i] = dataset.years[idx];
+            months_train[i] = dataset.months[idx];
+            X_train[i] = dataset.X[idx];
+            y_train[i] = dataset.y[idx];
+        }
+        
+        // Create validation set
+        int[] accountKeys_val = new int[valSize];
+        int[] years_val = new int[valSize];
+        int[] months_val = new int[valSize];
+        double[][] X_val = new double[valSize][];
+        double[] y_val = new double[valSize];
+        
+        for (int i = 0; i < valSize; i++) {
+            int idx = trainingIndices.get(trainSize + i);
+            accountKeys_val[i] = dataset.accountKeys[idx];
+            years_val[i] = dataset.years[idx];
+            months_val[i] = dataset.months[idx];
+            X_val[i] = dataset.X[idx];
+            y_val[i] = dataset.y[idx];
+        }
+        
+        // Create test set
         int[] accountKeys_test = new int[testSize];
         int[] years_test = new int[testSize];
         int[] months_test = new int[testSize];
         double[][] X_test = new double[testSize][];
         double[] y_test = new double[testSize];
         
-        for (int i = 0; i < trainSize; i++) {
-            accountKeys_train[i] = dataset.accountKeys[i];
-            years_train[i] = dataset.years[i];
-            months_train[i] = dataset.months[i];
-            X_train[i] = dataset.X[i];
-            y_train[i] = dataset.y[i];
+        for (int i = 0; i < testSize; i++) {
+            int idx = trainingIndices.get(trainSize + valSize + i);
+            accountKeys_test[i] = dataset.accountKeys[idx];
+            years_test[i] = dataset.years[idx];
+            months_test[i] = dataset.months[idx];
+            X_test[i] = dataset.X[idx];
+            y_test[i] = dataset.y[idx];
         }
         
-        for (int i = 0; i < testSize; i++) {
-            accountKeys_test[i] = dataset.accountKeys[trainSize + i];
-            years_test[i] = dataset.years[trainSize + i];
-            months_test[i] = dataset.months[trainSize + i];
-            X_test[i] = dataset.X[trainSize + i];
-            y_test[i] = dataset.y[trainSize + i];
-        }
+        // Convert back to Double[] for compatibility
+        Double[] y_train_boxed = new Double[trainSize];
+        Double[] y_val_boxed = new Double[valSize];
+        Double[] y_test_boxed = new Double[testSize];
+        
+        for (int i = 0; i < trainSize; i++) y_train_boxed[i] = y_train[i];
+        for (int i = 0; i < valSize; i++) y_val_boxed[i] = y_val[i];
+        for (int i = 0; i < testSize; i++) y_test_boxed[i] = y_test[i];
         
         return new Dataset[] {
-            new Dataset(accountKeys_train, years_train, months_train, X_train, y_train, dataset.targetCol),
-            new Dataset(accountKeys_test, years_test, months_test, X_test, y_test, dataset.targetCol)
+            new Dataset(accountKeys_train, years_train, months_train, X_train, y_train_boxed, dataset.targetCol),
+            new Dataset(accountKeys_val, years_val, months_val, X_val, y_val_boxed, dataset.targetCol),
+            new Dataset(accountKeys_test, years_test, months_test, X_test, y_test_boxed, dataset.targetCol)
         };
     }
     
     /**
-     * Dataset class for focused features
+     * Get all future rows (target = null) for prediction
+     */
+    public static Dataset getFutureData(Dataset dataset) {
+        List<Integer> futureIndices = new ArrayList<>();
+        for (int i = 0; i < dataset.y.length; i++) {
+            if (dataset.y[i] == null) {
+                futureIndices.add(i);
+            }
+        }
+        
+        int futureSize = futureIndices.size();
+        
+        int[] accountKeys_future = new int[futureSize];
+        int[] years_future = new int[futureSize];
+        int[] months_future = new int[futureSize];
+        double[][] X_future = new double[futureSize][];
+        Double[] y_future = new Double[futureSize];
+        
+        for (int i = 0; i < futureSize; i++) {
+            int idx = futureIndices.get(i);
+            accountKeys_future[i] = dataset.accountKeys[idx];
+            years_future[i] = dataset.years[idx];
+            months_future[i] = dataset.months[idx];
+            X_future[i] = dataset.X[idx];
+            y_future[i] = null;
+        }
+        
+        return new Dataset(accountKeys_future, years_future, months_future, 
+                          X_future, y_future, dataset.targetCol);
+    }
+    
+    /**
+     * Dataset class
      */
     public static class Dataset {
         public int[] accountKeys;
         public int[] years;
         public int[] months;
-        public double[][] X;  // Features (already normalized)
-        public double[] y;    // Target (already normalized)
+        public double[][] X;
+        public Double[] y;  // Using Double to allow null for future predictions
         public String targetCol;
         
-        // Map (Account_Key, Year, Month) to index
-        public Map<String, Integer> recordKeyToIndex;
-        
-        public Dataset(int[] accountKeys, int[] years, int[] months, 
-                      double[][] X, double[] y, String targetCol) {
+        public Dataset(int[] accountKeys, int[] years, int[] months,
+                      double[][] X, Double[] y, String targetCol) {
             this.accountKeys = accountKeys;
             this.years = years;
             this.months = months;
             this.X = X;
             this.y = y;
             this.targetCol = targetCol;
-            
-            // Build map
-            this.recordKeyToIndex = new HashMap<>();
-            for (int i = 0; i < accountKeys.length; i++) {
-                String key = accountKeys[i] + "_" + years[i] + "_" + months[i];
-                recordKeyToIndex.put(key, i);
+        }
+        
+        /**
+         * Convert y to primitive double[] (only non-null values)
+         */
+        public double[] getYPrimitive() {
+            int count = 0;
+            for (Double val : y) {
+                if (val != null) count++;
             }
-        }
-        
-        /**
-         * Get features by Account_Key, Year, Month
-         */
-        public double[] getFeaturesByKey(int accountKey, int year, int month) {
-            String key = accountKey + "_" + year + "_" + month;
-            Integer index = recordKeyToIndex.get(key);
-            return index != null ? X[index] : null;
-        }
-        
-        /**
-         * Get actual value by Account_Key, Year, Month
-         */
-        public Double getActualByKey(int accountKey, int year, int month) {
-            String key = accountKey + "_" + year + "_" + month;
-            Integer index = recordKeyToIndex.get(key);
-            return index != null ? y[index] : null;
-        }
-        
-        /**
-         * Get the latest record for an account
-         */
-        public Integer getLatestIndexByAccount(int accountKey) {
-            Integer latestIndex = null;
-            int latestYear = 0;
-            int latestMonth = 0;
             
-            for (int i = 0; i < accountKeys.length; i++) {
-                if (accountKeys[i] == accountKey) {
-                    if (years[i] > latestYear || 
-                        (years[i] == latestYear && months[i] > latestMonth)) {
-                        latestYear = years[i];
-                        latestMonth = months[i];
-                        latestIndex = i;
-                    }
+            double[] result = new double[count];
+            int idx = 0;
+            for (Double val : y) {
+                if (val != null) {
+                    result[idx++] = val;
                 }
             }
-            
-            return latestIndex;
+            return result;
         }
     }
 }
